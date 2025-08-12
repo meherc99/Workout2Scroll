@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- App Theme Colors -->
+    <color name="background_color">#FF121212</color>
+    <color name="header_background">#FF1E1E1E</color>
+    <color name="card_background">#FF2A2A2A</color>
+    
+    <!-- Text Colors -->
+    <color name="primary_text">#FFFFFFFF</color>
+    <color name="secondary_text">#FFBBBBBB</color>
+    
+    <!-- Button Colors -->
+    <color name="instagram_color">#FFE4405F</color>
+    <color name="start_color">#FF4CAF50</color>
+    <color name="stop_color">#FFF44336</color>
+    <color name="reset_color">#FFFF9800</color>
+    <color name="progress_color">#FF03DAC5</color>
+    
+    <!-- Pose Detection Colors -->
+    <color name="pose_line_color">#FF00FF00</color>
+    <color name="pose_point_color">#FFFF0000</color>
+</resources>

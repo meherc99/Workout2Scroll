@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Workout2Scroll</string>
+    <string name="camera_permission_required">Camera permission is required for pose detection</string>
+    <string name="usage_stats_permission_required">Usage access permission is required to monitor Instagram</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="squats_earned_format">Great! You earned %d minutes of Instagram time!</string>
+    <string name="instagram_time_format">Instagram Time: %d min</string>
+    <string name="squat_count_format">Squats: %d</string>
+    <string name="stand_in_front_camera">Stand in front of camera to start</string>
+    <string name="detecting_pose">Detecting your pose...</string>
+    <string name="squat_detected">Squat detected! Keep going!</string>
+    <string name="start_workout">Start Workout</string>
+    <string name="stop_workout">Stop Workout</string>
+    <string name="reset">Reset</string>
+    <string name="open_instagram">Open Instagram</string>
+    <string name="no_instagram_time">No Instagram time available. Do squats to earn time!</string>
+</resources>

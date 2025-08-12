@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Workout2Scroll" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/instagram_color</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/header_background</item>
+        <item name="colorOnPrimaryContainer">@color/white</item>
+        <item name="colorSecondary">@color/progress_color</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <item name="colorSurface">@color/background_color</item>
+        <item name="colorOnSurface">@color/primary_text</item>
+        <item name="android:statusBarColor">@color/header_background</item>
+        <item name="android:navigationBarColor">@color/background_color</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
