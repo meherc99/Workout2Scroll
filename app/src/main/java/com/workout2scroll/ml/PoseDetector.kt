@@ -2,15 +2,17 @@ package com.workout2scroll.ml
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.RectF
 import androidx.camera.core.ImageProxy
+import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.FileUtil
-import org.tensorflow.lite.support.image.ImageProcessor
-import org.tensorflow.lite.support.image.TensorImage
-import org.tensorflow.lite.support.image.ops.ResizeOp
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.min
 
 data class Keypoint(
     val x: Float,
@@ -20,7 +22,10 @@ data class Keypoint(
 
 data class PoseData(
     val keypoints: List<Keypoint>,
-    val confidence: Float
+    val confidence: Float,
+    val imageWidth: Int = 1,
+    val imageHeight: Int = 1,
+    val mirrored: Boolean = false
 )
 
 class PoseDetector(private val context: Context) {
@@ -50,84 +55,79 @@ class PoseDetector(private val context: Context) {
     }
     
     private var interpreter: Interpreter? = null
-    private val imageProcessor = ImageProcessor.Builder()
-        .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
-        .build()
+    var initializationError: String? = null
+        private set
+    val isReady: Boolean get() = interpreter != null
     
     init {
         try {
             val model = FileUtil.loadMappedFile(context, MODEL_FILE)
-            interpreter = Interpreter(model)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-    
-    suspend fun detectPose(imageProxy: ImageProxy): PoseData? {
-        return try {
-            val bitmap = imageProxyToBitmap(imageProxy)
-            val rotatedBitmap = rotateBitmap(bitmap, imageProxy.imageInfo.rotationDegrees.toFloat())
-            detectPoseFromBitmap(rotatedBitmap)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-    
-    suspend fun detectPoseFromBitmap(bitmap: Bitmap): PoseData? {
-        return detectPose(bitmap)
-    }
-    
-    private fun detectPose(bitmap: Bitmap): PoseData? {
-        val interpreter = this.interpreter ?: return null
-        
-        try {
-            // Prepare input
-            val tensorImage = TensorImage.fromBitmap(bitmap)
-            val processedImage = imageProcessor.process(tensorImage)
-            val inputBuffer = processedImage.buffer
-            
-            // Prepare output
-            val outputArray = Array(1) { Array(1) { Array(17) { FloatArray(3) } } }
-            
-            // Run inference
-            interpreter.run(inputBuffer, outputArray)
-            
-            // Parse results
-            val keypoints = mutableListOf<Keypoint>()
-            val keypointData = outputArray[0][0]
-            
-            for (i in keypointData.indices) {
-                val y = keypointData[i][0]
-                val x = keypointData[i][1]
-                val confidence = keypointData[i][2]
-                
-                keypoints.add(Keypoint(x, y, confidence))
+            interpreter = Interpreter(model, Interpreter.Options().setNumThreads(2))
+            require(interpreter!!.getInputTensor(0).shape().contentEquals(intArrayOf(1, INPUT_SIZE, INPUT_SIZE, 3))) {
+                "Unsupported MoveNet input shape"
             }
-            
-            // Calculate overall confidence
-            val avgConfidence = keypoints.map { it.confidence }.average().toFloat()
-            
-            return PoseData(keypoints, avgConfidence)
-            
         } catch (e: Exception) {
-            e.printStackTrace()
-            return null
+            interpreter?.close()
+            interpreter = null
+            initializationError = e.message ?: "MoveNet model could not be loaded"
         }
     }
     
-    private fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
-        val buffer = imageProxy.planes[0].buffer
-        val bytes = ByteArray(buffer.remaining())
-        buffer.get(bytes)
-        
-        // Convert YUV to RGB (simplified - in real implementation you'd handle YUV properly)
-        // For now, we'll create a placeholder bitmap
-        return Bitmap.createBitmap(
-            imageProxy.width,
-            imageProxy.height,
-            Bitmap.Config.ARGB_8888
-        )
+    fun detectPose(imageProxy: ImageProxy, mirrored: Boolean = true): PoseData {
+        val bitmap = imageProxy.toBitmap()
+        var rotatedBitmap = bitmap
+        try {
+            rotatedBitmap = rotateBitmap(bitmap, imageProxy.imageInfo.rotationDegrees.toFloat())
+            return detectPoseFromBitmap(rotatedBitmap).copy(mirrored = mirrored)
+        } finally {
+            if (rotatedBitmap !== bitmap) rotatedBitmap.recycle()
+            bitmap.recycle()
+        }
+    }
+    
+    @Synchronized
+    fun detectPoseFromBitmap(bitmap: Bitmap): PoseData {
+        val interpreter = checkNotNull(this.interpreter) { initializationError ?: "Pose detector is closed" }
+        val scale = min(INPUT_SIZE.toFloat() / bitmap.width, INPUT_SIZE.toFloat() / bitmap.height)
+        val scaledWidth = bitmap.width * scale
+        val scaledHeight = bitmap.height * scale
+        val left = (INPUT_SIZE - scaledWidth) / 2f
+        val top = (INPUT_SIZE - scaledHeight) / 2f
+        val inputBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888)
+        try {
+            Canvas(inputBitmap).apply {
+                drawColor(Color.BLACK)
+                drawBitmap(bitmap, null, RectF(left, top, left + scaledWidth, top + scaledHeight),
+                    android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+            }
+            val inputTensor = interpreter.getInputTensor(0)
+            val inputBuffer = ByteBuffer.allocateDirect(inputTensor.numBytes()).order(ByteOrder.nativeOrder())
+            val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
+            inputBitmap.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
+            for (pixel in pixels) {
+                for (channel in intArrayOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))) {
+                    when (inputTensor.dataType()) {
+                        DataType.INT32 -> inputBuffer.putInt(channel)
+                        DataType.UINT8 -> inputBuffer.put(channel.toByte())
+                        DataType.FLOAT32 -> inputBuffer.putFloat(channel.toFloat())
+                        else -> error("Unsupported MoveNet input type: ${inputTensor.dataType()}")
+                    }
+                }
+            }
+            inputBuffer.rewind()
+            val outputArray = Array(1) { Array(1) { Array(17) { FloatArray(3) } } }
+            interpreter.run(inputBuffer, outputArray)
+            val keypoints = outputArray[0][0].map { values ->
+                Keypoint(
+                    (values[1] * INPUT_SIZE - left) / scaledWidth,
+                    (values[0] * INPUT_SIZE - top) / scaledHeight,
+                    values[2]
+                )
+            }
+            return PoseData(keypoints, keypoints.map { it.confidence }.average().toFloat(), bitmap.width, bitmap.height)
+        } finally {
+            inputBitmap.recycle()
+        }
     }
     
     private fun rotateBitmap(bitmap: Bitmap, rotationDegrees: Float): Bitmap {
@@ -136,7 +136,9 @@ class PoseDetector(private val context: Context) {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
     
+    @Synchronized
     fun close() {
         interpreter?.close()
+        interpreter = null
     }
 }

@@ -74,8 +74,16 @@ class PoseOverlayView @JvmOverloads constructor(
         
         val pose = poseData ?: return
         
-        val scaleX = width.toFloat()
-        val scaleY = height.toFloat()
+        if (width == 0 || height == 0 || pose.imageWidth <= 0 || pose.imageHeight <= 0) return
+        val scale = minOf(width.toFloat() / pose.imageWidth, height.toFloat() / pose.imageHeight)
+        val scaleX = pose.imageWidth * scale
+        val scaleY = pose.imageHeight * scale
+        val checkpoint = canvas.save()
+        canvas.translate((width - scaleX) / 2f, (height - scaleY) / 2f)
+        if (pose.mirrored) {
+            canvas.translate(scaleX, 0f)
+            canvas.scale(-1f, 1f)
+        }
         
         // Draw pose connections (skeleton)
         for (connection in poseConnections) {
@@ -106,6 +114,7 @@ class PoseOverlayView @JvmOverloads constructor(
         
         // Highlight squat-relevant joints (hips, knees, ankles) with different color
         highlightSquatJoints(canvas, pose, scaleX, scaleY)
+        canvas.restoreToCount(checkpoint)
     }
     
     private fun highlightSquatJoints(canvas: Canvas, pose: PoseData, scaleX: Float, scaleY: Float) {

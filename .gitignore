@@ -1,6 +1,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/kotlin,android,gradle
 # Edit at https://www.toptal.com/developers/gitignore?templates=kotlin,android,gradle
 
+.vscode
+.idea
+
 ### Android ###
 # Built application files
 *.apk
