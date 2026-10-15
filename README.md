@@ -1,11 +1,12 @@
 # Workout2Scroll - Earn Instagram Time Through Exercise
 
-Workout2Scroll is an Android app that gamifies social media usage by requiring users to perform squats to earn Instagram time. Using Google's MoveNet pose detection model, the app tracks squat exercises in real-time and rewards users with Instagram access minutes.
+Workout2Scroll is an Android app that lets users perform squats or push-ups to earn Instagram time. Using Google's MoveNet pose detection model, the app tracks the selected exercise in real time or in uploaded videos and rewards completed repetitions with Instagram access minutes.
 
 ## Features
 
-- **Real-time Pose Detection**: Uses MoveNet TensorFlow Lite model for accurate squat detection
-- **Gamified Instagram Access**: Earn 1 minute of Instagram time for every squat performed
+- **Real-time Pose Detection**: Uses MoveNet TensorFlow Lite for squat and push-up detection
+- **Exercise Selection**: Choose squats or push-ups before starting a camera workout or uploading a clip; the choice persists between launches and is locked during processing
+- **Gamified Instagram Access**: Earn 1 minute per squat or 2 minutes per push-up
 - **Visual Feedback**: Live pose overlay showing skeleton tracking during workouts
 - **Daily Reset**: Instagram time resets each day to encourage daily exercise
 - **Video Workouts**: Analyze a local workout clip, with progress, cancellation, and duplicate-reward protection
@@ -15,8 +16,8 @@ Workout2Scroll is an Android app that gamifies social media usage by requiring u
 ## How It Works
 
 1. **Start Workout**: Grant camera access when starting a live workout. The front camera is preferred; the back camera is used if necessary. Video uploads do not need camera or storage permission.
-2. **Perform Squats**: Keep both hips, knees, and ankles visible. The counter requires standing, bending both knees, and returning to standing. Lost tracking discards an incomplete repetition.
-3. **Earn Time**: Each completed squat earns one minute. Uploaded clips must be 1 second to 10 minutes, at least 224x224, and supported by the device decoder. A completed file can earn a reward only once.
+2. **Choose and Perform an Exercise**: Squats require both hips, knees, and ankles visible, starting standing, bending both knees, and returning to standing. For push-ups, position the camera side-on so at least one shoulder, elbow, wrist, hip, and ankle are visible. Start with arms extended in a plank, lower, and return to extended arms. Lost tracking discards an incomplete repetition.
+3. **Earn Time**: Each completed squat earns one minute; each push-up earns two. Uploaded clips use the same exercise selection and reward rates. Clips must be 1 second to 10 minutes, at least 224x224, and supported by the device decoder. A completed file can earn a reward only once, even if the exercise selection changes.
 4. **Enable Instagram Guard**: Read the disclosure and explicitly enable Workout2Scroll in Android accessibility settings. Sideloaded apps may require "Allow restricted settings" in Android app settings first.
 5. **Use Instagram**: Install the native Instagram app and open it with earned time. Launching does not charge a minute; foreground usage is deducted as it happens, including direct launches outside Workout2Scroll.
 
@@ -32,6 +33,12 @@ Workout2Scroll is an Android app that gamifies social media usage by requiring u
 - Detects transition from standing to squatting position
 - Validates proper form before counting repetitions
 - Prevents false positives through confidence thresholds
+
+### Push-up Detection Algorithm
+- Uses the best visible side and requires consistent side tracking through a repetition
+- Checks horizontal plank-like posture, shoulder-hip-ankle alignment, and a wrist below the shoulder
+- Requires an extended-arm, lowered, extended-arm cycle with at least two consecutive frames at each endpoint
+- Uses aspect-correct elbow angles; tracking loss, posture loss, or a side change discards an incomplete repetition
 
 ### Instagram Integration
 - Observes foreground package changes using a user-enabled AccessibilityService, without retrieving window contents
@@ -78,7 +85,9 @@ app/src/main/java/com/workout2scroll/
 ├── MainActivity.kt                 # Main activity with camera and UI
 ├── ml/
 │   ├── PoseDetector.kt            # MoveNet integration
-│   └── SquatCounter.kt            # Squat detection logic
+│   ├── SquatCounter.kt            # Squat detection logic
+│   ├── PushupCounter.kt           # Push-up detection logic
+│   └── ExerciseCounter.kt         # Exercise selection and reward rates
 ├── ui/
 │   └── PoseOverlayView.kt         # Pose visualization overlay
 └── utils/
@@ -87,7 +96,7 @@ app/src/main/java/com/workout2scroll/
 
 ## Future Enhancements
 
-- **Multiple Exercises**: Add push-ups, jumping jacks, etc.
+- **More Exercises**: Add jumping jacks and other movements
 - **Social Features**: Leaderboards and challenges
 - **Workout Plans**: Structured exercise routines
 - **Health Integration**: Connect with fitness apps
@@ -112,13 +121,13 @@ app/src/main/java/com/workout2scroll/
 ./gradlew connectedDebugAndroidTest
 ```
 
-The suite includes 23 local unit tests and 15 Android instrumentation tests. Device tests run the bundled TFLite model, live CameraX frames, actual video decoding, picker-result processing, cancellation, duplicate rewards, persistence, and UI navigation. The small blank-video fixture is generated media, not a recorded workout. Instrumentation tests clear the app balance and grant camera permission: run them on a disposable emulator, not an installation whose data matters.
+Local tests cover squat and push-up state machines, exercise reward rates, balances, and video helpers. Device tests run the bundled TFLite model, live CameraX frames, actual video decoding, picker-result processing, cancellation, duplicate rewards, persistence, exercise selection, and UI navigation. The small blank-video fixture is generated media, not a recorded workout. Instrumentation tests clear the app balance and grant camera permission: run them on a disposable emulator, not an installation whose data matters.
 
 See [TESTING.md](TESTING.md) for verified coverage and the physical-device acceptance checklist.
 
 ## Limitations
 
-The guard is a voluntary habit tool, not tamper-proof parental control. It depends on an enabled, connected accessibility service and Android delivering window events. It cannot monitor browser Instagram, cloned package variants, or reliably account for every OEM overlay or multi-window mode. Disabling or force-stopping the service disables enforcement. Native Instagram expiry and real human squat accuracy still require physical-device acceptance testing.
+The guard is a voluntary habit tool, not tamper-proof parental control. It depends on an enabled, connected accessibility service and Android delivering window events. It cannot monitor browser Instagram, cloned package variants, or reliably account for every OEM overlay or multi-window mode. Disabling or force-stopping the service disables enforcement. Native Instagram expiry and real human squat and push-up accuracy still require physical-device acceptance testing. Push-up detection expects a side-on, largely horizontal body view; knee push-ups and strongly angled camera views are not supported.
 
 Duplicate detection identifies identical file bytes, not edited or re-encoded copies. Pose estimates are not a medical assessment or a guarantee of safe exercise form. Publishing an accessibility-based guard also requires reviewing the current Google Play Accessibility API policies and completing applicable declarations.
 

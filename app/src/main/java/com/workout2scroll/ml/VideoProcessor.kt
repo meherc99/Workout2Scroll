@@ -12,9 +12,9 @@ import kotlin.math.min
 class VideoProcessor(
     private val context: Context,
     private val poseDetector: PoseDetector,
-    private val squatCounter: SquatCounter,
-    private val onProgress: (progress: Int, squatCount: Int) -> Unit,
-    private val onComplete: (totalSquats: Int) -> Unit,
+    private val squatCounter: RepCounter,
+    private val onProgress: (progress: Int, repetitions: Int) -> Unit,
+    private val onComplete: (totalRepetitions: Int) -> Unit,
     private val onError: (error: String) -> Unit
 ) {
 

@@ -22,6 +22,17 @@
     <string name="squats_earned_format">Great! You earned %d minutes of Instagram time!</string>
     <string name="instagram_time_format">Instagram Time: %d min</string>
     <string name="squat_count_format">Squats: %d</string>
+    <string name="pushup_count_format">Push-ups: %d</string>
+    <string name="squats_option">Squats · 1 min</string>
+    <string name="pushups_option">Push-ups · 2 min</string>
+    <string name="pushup_ready">Ready for push-ups</string>
+    <string name="pushup_tracking_lost">Push-up position not detected</string>
+    <string name="pushup_lowered">Push-up lowered position</string>
+    <string name="pushup_extended">Push-up arms extended</string>
+    <string name="squat_lowered">Squat position detected</string>
+    <string name="video_ready">Ready to select a video</string>
+    <string name="exercise_processing_format">Processing: %1$d%% | %2$s</string>
+    <string name="exercise_video_complete_format">Video complete: %1$s, %2$d minutes earned</string>
     <string name="stand_in_front_camera">Stand in front of camera to start</string>
     <string name="detecting_pose">Detecting your pose...</string>
     <string name="squat_detected">Squat detected! Keep going!</string>
@@ -29,5 +40,5 @@
     <string name="stop_workout">Stop Workout</string>
     <string name="reset">Reset</string>
     <string name="open_instagram">Open Instagram</string>
-    <string name="no_instagram_time">No Instagram time available. Do squats to earn time!</string>
+    <string name="no_instagram_time">No Instagram time available. Complete a workout to earn time!</string>
 </resources>

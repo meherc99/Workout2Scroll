@@ -78,11 +78,11 @@ class InstagramTimeManager(private val context: Context) {
         prefs.getStringSet("rewarded_videos", emptySet())!!.contains(fingerprint)
     }
 
-    fun rewardVideoOnce(fingerprint: String, squats: Int): Boolean = synchronized(lock) {
+    fun rewardVideoOnce(fingerprint: String, minutes: Int): Boolean = synchronized(lock) {
         require(fingerprint.matches(Regex("[0-9a-f]{64}")))
-        require(squats >= 0)
+        require(minutes >= 0)
         if (hasRewardedVideo(fingerprint)) return false
-        save(load().credit(squats), fingerprint)
+        save(load().credit(minutes), fingerprint)
         true
     }
 

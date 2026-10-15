@@ -2,7 +2,7 @@ package com.workout2scroll.ml
 
 import kotlin.math.*
 
-class SquatCounter(private val onSquatDetected: () -> Unit) {
+class SquatCounter(private val onSquatDetected: () -> Unit) : RepCounter {
     
     private var squatCount = 0
     private var isInSquatPosition = false
@@ -13,7 +13,7 @@ class SquatCounter(private val onSquatDetected: () -> Unit) {
     private val standingAngleThreshold = 160f // degrees
     private val confidenceThreshold = 0.3f
     
-    fun analyzePose(poseData: PoseData) {
+    override fun analyzePose(poseData: PoseData) {
         if (!poseData.confidence.isFinite() || poseData.confidence < confidenceThreshold) {
             resetMovement()
             return
@@ -100,14 +100,14 @@ class SquatCounter(private val onSquatDetected: () -> Unit) {
         }
     }
     
-    fun getCount(): Int = squatCount
+    override fun getCount(): Int = squatCount
     
-    fun reset() {
+    override fun reset() {
         squatCount = 0
         resetMovement()
     }
 
-    fun resetMovement() {
+    override fun resetMovement() {
         isInSquatPosition = false
         wasStanding = false
     }

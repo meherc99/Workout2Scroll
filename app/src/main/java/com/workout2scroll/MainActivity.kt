@@ -20,7 +20,8 @@ import androidx.lifecycle.Lifecycle
 import com.google.android.material.tabs.TabLayout
 import com.workout2scroll.databinding.ActivityMainBinding
 import com.workout2scroll.ml.PoseDetector
-import com.workout2scroll.ml.SquatCounter
+import com.workout2scroll.ml.ExerciseCounter
+import com.workout2scroll.ml.ExerciseType
 import com.workout2scroll.ml.VideoProcessor
 import com.workout2scroll.ml.VideoFingerprint
 import com.workout2scroll.utils.InstagramTimeManager
@@ -45,7 +46,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var poseDetector: PoseDetector
-    private lateinit var squatCounter: SquatCounter
+    private lateinit var exerciseCounter: ExerciseCounter
+    private lateinit var videoExerciseCounter: ExerciseCounter
+    private var selectedExercise = ExerciseType.SQUAT
     private lateinit var instagramTimeManager: InstagramTimeManager
     private lateinit var videoProcessor: VideoProcessor
 
@@ -115,40 +118,45 @@ class MainActivity : AppCompatActivity() {
     private fun initializeComponents() {
         cameraExecutor = Executors.newSingleThreadExecutor()
         poseDetector = PoseDetector(this)
-        squatCounter = SquatCounter {
-            onSquatDetected()
-        }
+        val savedExercise = getSharedPreferences("exercise_settings", MODE_PRIVATE)
+            .getString("selected_exercise", ExerciseType.SQUAT.name)
+        selectedExercise = ExerciseType.values().firstOrNull { it.name == savedExercise } ?: ExerciseType.SQUAT
+        exerciseCounter = ExerciseCounter { exercise -> onRepDetected(exercise) }
+        exerciseCounter.selectExercise(selectedExercise)
+        videoExerciseCounter = ExerciseCounter {}
+        videoExerciseCounter.selectExercise(selectedExercise)
         instagramTimeManager = InstagramTimeManager(this)
         videoProcessor = VideoProcessor(
             context = this,
             poseDetector = poseDetector,
-            squatCounter = SquatCounter { /* video squat callback */ },
-            onProgress = { progress, squatCount ->
+            repCounter = videoExerciseCounter,
+            onProgress = { progress, repetitions ->
                 runOnUiThread {
                     binding.processingProgressBar.progress = progress
-                    binding.processingStatusText.text = "Processing: $progress% | $squatCount squats"
+                    binding.processingStatusText.text = getString(R.string.exercise_processing_format,
+                        progress, exerciseCountText(videoExerciseCounter.exercise, repetitions))
                 }
             },
-            onComplete = { totalSquats ->
+            onComplete = { totalRepetitions ->
                 runOnUiThread {
-                    Log.i(TAG, "Video completion received: squats=$totalSquats")
+                    val exercise = videoExerciseCounter.exercise
+                    val earnedMinutes = exercise.earnedMinutes(totalRepetitions)
+                    Log.i(TAG, "Video completion received: exercise=$exercise reps=$totalRepetitions minutes=$earnedMinutes")
                     binding.processingStatusText.text = "Processing complete!"
-                    binding.squatCountText.text = getString(R.string.squat_count_format, totalSquats)
+                    binding.squatCountText.text = exerciseCountText(exercise, totalRepetitions)
 
-                    // Award minutes for video squats
                     val fingerprint = checkNotNull(videoFingerprint)
-                    if (!instagramTimeManager.rewardVideoOnce(fingerprint, totalSquats)) {
+                    if (!instagramTimeManager.rewardVideoOnce(fingerprint, earnedMinutes)) {
                         Log.w(TAG, "Video reward rejected: previously rewarded content")
                         binding.tvStatus.text = "This video has already earned its reward"
                         return@runOnUiThread
                     }
                     updateInstagramTime()
 
-                    Toast.makeText(this@MainActivity,
-                        "Found $totalSquats squats! Earned $totalSquats minutes!",
-                        Toast.LENGTH_LONG).show()
-
-                    binding.tvStatus.text = "Video complete: $totalSquats squats, $totalSquats minutes earned"
+                    val result = getString(R.string.exercise_video_complete_format,
+                        exerciseCountText(exercise, totalRepetitions), earnedMinutes)
+                    Toast.makeText(this@MainActivity, result, Toast.LENGTH_LONG).show()
+                    binding.tvStatus.text = result
                 }
             },
             onError = { error ->
@@ -168,6 +176,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupUI() {
         updateInstagramTime()
+        binding.exerciseToggleGroup.check(if (selectedExercise == ExerciseType.SQUAT)
+            R.id.squatsOption else R.id.pushupsOption)
+        binding.squatCountText.text = exerciseCountText(selectedExercise, 0)
+        binding.exerciseToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked && !isWorkoutActive && videoJob?.isActive != true) {
+                val exercise = if (checkedId == R.id.pushupsOption) ExerciseType.PUSHUP else ExerciseType.SQUAT
+                if (exercise != selectedExercise) {
+                    workoutSession++
+                    selectedExercise = exercise
+                    exerciseCounter.selectExercise(exercise)
+                    videoExerciseCounter.selectExercise(exercise)
+                    getSharedPreferences("exercise_settings", MODE_PRIVATE).edit()
+                        .putString("selected_exercise", exercise.name).apply()
+                    binding.squatCountText.text = exerciseCountText(exercise, 0)
+                    binding.tvStatus.text = if (isLiveMode) exerciseReadyText() else getString(R.string.video_ready)
+                    binding.poseOverlayView.clearPose()
+                }
+            }
+        }
         binding.cameraPreviewView.previewStreamState.observe(this) { state ->
             Log.i(TAG, "Preview stream state: state=$state liveMode=$isLiveMode cameraReady=$cameraReady size=${binding.cameraPreviewView.width}x${binding.cameraPreviewView.height} shown=${binding.cameraPreviewView.isShown}")
         }
@@ -204,12 +231,22 @@ class MainActivity : AppCompatActivity() {
         binding.guardSettingsButton.setOnClickListener { showGuardSetup() }
     }
 
-    private fun onSquatDetected() {
+    private fun exerciseCountText(exercise: ExerciseType, count: Int): String = getString(
+        if (exercise == ExerciseType.SQUAT) R.string.squat_count_format else R.string.pushup_count_format, count)
+
+    private fun exerciseReadyText(): String = getString(
+        if (selectedExercise == ExerciseType.SQUAT) R.string.stand_in_front_camera else R.string.pushup_ready)
+
+    private fun setExerciseSelectorEnabled(enabled: Boolean) {
+        binding.squatsOption.isEnabled = enabled
+        binding.pushupsOption.isEnabled = enabled
+    }
+
+    private fun onRepDetected(exercise: ExerciseType) {
         runOnUiThread {
-            Log.i(TAG, "Squat reward: session=$workoutSession count=${squatCounter.getCount()} minutes=1")
-            binding.squatCountText.text = getString(R.string.squat_count_format, squatCounter.getCount())
-            // Award 1 minute per squat
-            instagramTimeManager.addTime(1)
+            Log.i(TAG, "Rep reward: session=$workoutSession exercise=$exercise count=${exerciseCounter.getCount()} minutes=${exercise.minutesPerRep}")
+            binding.squatCountText.text = exerciseCountText(exercise, exerciseCounter.getCount())
+            instagramTimeManager.addTime(exercise.earnedMinutes(1))
             updateInstagramTime()
         }
     }
@@ -225,6 +262,7 @@ class MainActivity : AppCompatActivity() {
         binding.stopWorkoutButton.visibility = if (isWorkoutActive) View.VISIBLE else View.GONE
         binding.videoUploadLayout.visibility = View.GONE
         binding.videoProcessingLayout.visibility = View.GONE
+        if (!isWorkoutActive) binding.tvStatus.text = exerciseReadyText()
         logWorkoutControlBounds()
 
         if (allPermissionsGranted()) {
@@ -247,7 +285,7 @@ class MainActivity : AppCompatActivity() {
         stopWorkout()
         cameraProvider?.unbindAll()
         cameraReady = false
-        binding.tvStatus.text = "Ready to select a video"
+        binding.tvStatus.text = getString(R.string.video_ready)
     }
 
     private fun checkStoragePermissionAndSelectVideo() {
@@ -285,6 +323,8 @@ class MainActivity : AppCompatActivity() {
         binding.processingProgressBar.progress = 0
         binding.processingStatusText.text = "Validating video..."
         binding.tvStatus.text = "Processing video"
+        videoExerciseCounter.selectExercise(selectedExercise)
+        setExerciseSelectorEnabled(false)
         videoJob = lifecycleScope.launch {
           try {
             videoFingerprint = withContext(Dispatchers.IO) {
@@ -328,6 +368,7 @@ class MainActivity : AppCompatActivity() {
               videoFingerprint = null
               binding.videoProcessingLayout.visibility = View.GONE
               binding.videoUploadLayout.visibility = if (isLiveMode) View.GONE else View.VISIBLE
+              setExerciseSelectorEnabled(!isWorkoutActive)
             }
         }
     }
@@ -394,7 +435,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 cameraReady = true
                 Log.i(TAG, "Camera bound: front=$usingFrontCamera preview=${binding.cameraPreviewView.width}x${binding.cameraPreviewView.height} rotation=${binding.cameraPreviewView.display?.rotation}")
-                if (!isWorkoutActive) binding.tvStatus.text = getString(R.string.stand_in_front_camera)
+                if (!isWorkoutActive) binding.tvStatus.text = exerciseReadyText()
             } catch (exc: Exception) {
                 Log.e(TAG, "Camera initialization or lifecycle binding failed", exc)
                 cameraReady = false
@@ -427,8 +468,9 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.startWorkoutButton.visibility = View.GONE
         binding.stopWorkoutButton.visibility = View.VISIBLE
-        squatCounter.reset()
-        binding.squatCountText.text = getString(R.string.squat_count_format, 0)
+        exerciseCounter.reset()
+        setExerciseSelectorEnabled(false)
+        binding.squatCountText.text = exerciseCountText(selectedExercise, 0)
         binding.tvStatus.text = getString(R.string.detecting_pose)
     }
 
@@ -438,7 +480,8 @@ class MainActivity : AppCompatActivity() {
         workoutSession++
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.poseOverlayView.clearPose()
-        if (::squatCounter.isInitialized) squatCounter.resetMovement()
+        if (::exerciseCounter.isInitialized) exerciseCounter.resetMovement()
+        setExerciseSelectorEnabled(videoJob?.isActive != true)
         binding.startWorkoutButton.text = getString(R.string.start_workout)
         binding.startWorkoutButton.visibility = if (isLiveMode) View.VISIBLE else View.GONE
         binding.stopWorkoutButton.visibility = View.GONE
@@ -490,11 +533,15 @@ class MainActivity : AppCompatActivity() {
                     }
                     runOnUiThread {
                         if (isWorkoutActive && isLiveMode && session == workoutSession && !isDestroyed) {
-                            squatCounter.analyzePose(poseData)
+                            exerciseCounter.analyzePose(poseData)
                             binding.poseOverlayView.updatePose(poseData)
                             binding.tvStatus.text = when {
                                 poseData.confidence < 0.3f -> "Full body not detected"
-                                squatCounter.isCurrentlySquatting() -> "Squat position detected"
+                                selectedExercise == ExerciseType.PUSHUP && !exerciseCounter.isTrackingPushup() ->
+                                    getString(R.string.pushup_tracking_lost)
+                                exerciseCounter.isCurrentlyLowered() -> getString(
+                                    if (selectedExercise == ExerciseType.SQUAT) R.string.squat_lowered else R.string.pushup_lowered)
+                                selectedExercise == ExerciseType.PUSHUP -> getString(R.string.pushup_extended)
                                 else -> "Standing"
                             }
                         }

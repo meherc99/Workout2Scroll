@@ -15,6 +15,30 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
+    @Test fun exerciseSelectionPersistsAndAppliesToBothModes() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            try {
+                onView(withId(R.id.pushupsOption)).perform(scrollTo(), click())
+                onView(withId(R.id.squatCountText)).check(matches(withText("Push-ups: 0")))
+                scenario.recreate()
+                scenario.onActivity { activity ->
+                    val group = activity.findViewById<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.exerciseToggleGroup)
+                    assertEquals(R.id.pushupsOption, group.checkedButtonId)
+                    assertEquals("Push-ups: 0", activity.findViewById<android.widget.TextView>(R.id.squatCountText).text.toString())
+                }
+                onView(withText("Upload Video")).perform(scrollTo(), click())
+                onView(withId(R.id.squatCountText)).check(matches(withText("Push-ups: 0")))
+                onView(withId(R.id.squatsOption)).perform(scrollTo(), click())
+                onView(withId(R.id.squatCountText)).check(matches(withText("Squats: 0")))
+            } finally {
+                scenario.onActivity { activity ->
+                    activity.getSharedPreferences("exercise_settings", android.content.Context.MODE_PRIVATE)
+                        .edit().clear().commit()
+                }
+            }
+        }
+    }
+
     @Test fun startsWithoutPermissionsAndCanSwitchModes() {
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(withText("Upload Video")).perform(click())

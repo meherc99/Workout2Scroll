@@ -138,6 +138,42 @@
 
         </com.google.android.material.tabs.TabLayout>
 
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/exerciseToggleGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            app:checkedButton="@id/squatsOption">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/squatsOption"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/squats_option"
+                android:textAllCaps="false"
+                android:textSize="13sp"
+                android:paddingHorizontal="8dp"
+                android:minHeight="48dp"
+                app:cornerRadius="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/pushupsOption"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/pushups_option"
+                android:textAllCaps="false"
+                android:textSize="13sp"
+                android:paddingHorizontal="8dp"
+                android:minHeight="48dp"
+                app:cornerRadius="8dp" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
     </LinearLayout>
 
     <!-- Content Container -->
