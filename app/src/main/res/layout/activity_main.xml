@@ -8,9 +8,11 @@
     android:background="@color/background_color"
     tools:context=".MainActivity">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="24dp">
 
     <!-- Header with Instagram Time and Mode Toggle -->
     <LinearLayout
@@ -18,97 +20,157 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@color/header_background"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textAppearance="?attr/textAppearanceHeadlineSmall"
-            android:textColor="@color/primary_text"
-            android:layout_marginBottom="8dp" />
+        android:paddingHorizontal="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:background="@color/header_background">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="12dp"
+                android:src="@drawable/ic_app_mark"
+                android:importantForAccessibility="no" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="22sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="0dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/balance_background"
+            android:padding="16dp"
+            android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/your_scroll_balance"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/instagram_color" />
 
                 <TextView
                     android:id="@+id/instagramTimeText"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="0:00 available"
-                    android:textAppearance="?attr/textAppearanceBody1"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/initial_balance"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="28sp"
+                    android:accessibilityLiveRegion="polite"
                     android:textColor="@color/primary_text" />
 
-                <Button
-                    android:id="@+id/openInstagramButton"
-                    android:layout_width="wrap_content"
+                <TextView
+                    android:id="@+id/dailyStatsText"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="13sp"
+                    android:textColor="@color/secondary_text" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/openInstagramButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
                     android:backgroundTint="@color/instagram_color"
                     android:text="@string/open_instagram"
-                    android:textColor="@android:color/white" />        </LinearLayout>
-
-        <TextView
-            android:id="@+id/dailyStatsText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/secondary_text"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+                    android:textColor="@android:color/white"
+                    app:icon="@drawable/ic_arrow_out"
+                    app:iconGravity="textEnd"
+                    app:iconTint="@color/white" />
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/guardSettingsButton"
-            style="?attr/materialButtonOutlinedStyle"
+            style="?attr/borderlessButtonStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:text="@string/guard_disabled"
+            android:textAllCaps="false"
+            android:textSize="13sp"
+            app:icon="@drawable/ic_shield"
+            app:iconGravity="textStart"
+            app:iconSize="18dp"
+            app:iconTint="@color/progress_color"
             android:textColor="@color/progress_color" />
 
         <!-- Mode Selection -->
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLayout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="4dp"
             android:background="@color/header_background"
-            app:tabTextColor="@color/white"
+            app:tabMode="fixed"
+            app:tabTextAppearance="@style/TextAppearance.Workout2Scroll.Tab"
+            app:tabTextColor="@color/secondary_text"
             app:tabSelectedTextColor="@color/progress_color"
+            app:tabIndicatorHeight="3dp"
+            app:tabIndicatorFullWidth="false"
             app:tabIndicatorColor="@color/progress_color">
 
             <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Live Camera" />
+                android:text="@string/live_camera" />
 
             <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Upload Video" />
+                android:text="@string/upload_video" />
 
         </com.google.android.material.tabs.TabLayout>
 
     </LinearLayout>
 
     <!-- Content Container -->
-    <FrameLayout
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/contentContainer"
-        android:layout_width="0dp"
-        android:layout_height="320dp"
-        android:layout_margin="16dp"
-        app:layout_constraintTop_toBottomOf="@id/headerLayout"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/squatInfoLayout">
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/workout_preview_height"
+        android:layout_marginHorizontal="20dp"
+        app:cardBackgroundColor="@color/card_background"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/outline_color"
+        app:strokeWidth="1dp">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
         <!-- Live Camera View -->
         <FrameLayout
             android:id="@+id/cameraView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@color/camera_background"
             android:visibility="visible">
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_camera"
+                android:importantForAccessibility="no"
+                app:tint="@color/outline_color" />
 
             <!-- Camera Preview -->
             <androidx.camera.view.PreviewView
@@ -133,33 +195,39 @@
             android:layout_height="match_parent"
             android:orientation="vertical"
             android:gravity="center"
+            android:padding="24dp"
             android:visibility="gone">
 
             <!-- Video Selection -->
             <ImageView
                 android:id="@+id/ivVideoIcon"
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:src="@android:drawable/ic_menu_gallery"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_upload"
+                android:importantForAccessibility="no"
                 app:tint="@color/progress_color"
                 android:layout_marginBottom="16dp" />
 
 <TextView
     android:id="@+id/tvVideoHint"
-    android:layout_width="wrap_content"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="24dp"
-    android:text="Select a workout video (MP4, AVI, MOV)\nMax 10 minutes, Min 224x224 resolution"
+    android:layout_marginBottom="8dp"
+    android:text="@string/workout_video"
     android:textColor="@color/primary_text"
-    android:textSize="16sp"
-    android:gravity="center" />                <Button
+    android:fontFamily="sans-serif-medium"
+    android:textSize="20sp"
+    android:gravity="center" />
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/selectVideoButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:layout_marginTop="16dp"
-                    android:backgroundTint="@color/instagram_color"
-                    android:text="Select Video"
+                    android:backgroundTint="@color/start_color"
+                    app:icon="@drawable/ic_upload"
+                    app:iconGravity="textStart"
+                    android:text="@string/select_video"
                     android:textColor="@android:color/white" />
 
                 </LinearLayout>
@@ -168,41 +236,50 @@
             <LinearLayout
                 android:id="@+id/videoProcessingLayout"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
                 android:orientation="vertical"
                 android:padding="24dp"
                 android:visibility="gone">
 
                 <TextView
                     android:id="@+id/processingStatusText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Processing video..."
-                    android:textAppearance="?attr/textAppearanceSubtitle1"
-                    android:textColor="@color/primary_text" />
-
-                <ProgressBar
-                    android:id="@+id/processingProgressBar"
-                    style="?android:attr/progressBarStyleHorizontal"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_gravity="center"
+                    android:text="@string/processing_video"
+                    android:gravity="center"
+                    android:textSize="16sp"
+                    android:accessibilityLiveRegion="polite"
+                    android:textColor="@color/primary_text" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/processingProgressBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:indeterminate="false"
+                    app:trackCornerRadius="2dp"
+                    app:trackThickness="4dp"
+                    app:trackColor="@color/outline_color"
+                    app:indicatorColor="@color/start_color"
                     android:progress="0" />
 
-                <Button
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/cancelProcessingButton"
+                    style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:layout_marginTop="16dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:text="Cancel"
+                    android:layout_marginTop="24dp"
+                    app:cornerRadius="8dp"
+                    android:text="@string/cancel"
                     android:textColor="@color/instagram_color" />
 
             </LinearLayout>
 
-    </FrameLayout>
+        </FrameLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Squat Information -->
     <LinearLayout
@@ -210,30 +287,38 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
-        android:background="@color/card_background"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="16dp"
-        app:layout_constraintBottom_toTopOf="@id/controlButtons"
-        app:layout_constraintTop_toBottomOf="@id/contentContainer">
+        android:paddingHorizontal="20dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/workout_session"
+                android:textSize="12sp"
+                android:textColor="@color/secondary_text"
+                android:layout_marginBottom="4dp" />
 
             <TextView
                 android:id="@+id/squatCountText"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="Squats: 0"
-                android:textAppearance="?attr/textAppearanceHeadline4"
+                android:text="@string/initial_squats"
+                android:textSize="26sp"
+                android:fontFamily="sans-serif-medium"
+                android:accessibilityLiveRegion="polite"
                 android:textColor="@color/primary_text"
-                android:textStyle="bold" />        <TextView
+                android:textStyle="normal" />
+        <TextView
             android:id="@+id/tvStatus"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:layout_marginTop="8dp"
-            android:text="Stand in front of camera to start"
+            android:text="@string/stand_in_front_camera"
             android:textColor="@color/secondary_text"
-            android:textSize="16sp" />
+            android:accessibilityLiveRegion="polite"
+            android:textSize="14sp" />
 
 
     </LinearLayout>
@@ -244,31 +329,33 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="16dp"
-        android:gravity="center"
-        app:layout_constraintBottom_toBottomOf="parent">
+        android:paddingHorizontal="20dp"
+        android:gravity="center">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/startWorkoutButton"
             android:layout_width="0dp"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginEnd="8dp"
             android:text="@string/start_workout"
             android:textSize="16sp"
+            app:icon="@drawable/ic_play"
+            app:iconGravity="textStart"
             android:backgroundTint="@color/start_color" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/stopWorkoutButton"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/stop_workout"
                 android:textSize="16sp"
+                app:icon="@drawable/ic_stop"
+                app:iconGravity="textStart"
                 android:backgroundTint="@color/stop_color"
                 android:visibility="gone" />
 
     </LinearLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>
 </androidx.core.widget.NestedScrollView>

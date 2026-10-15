@@ -2,6 +2,16 @@
     <string name="guard_name">Workout2Scroll Instagram Guard</string>
     <string name="guard_description">Observes foreground app names to time the native Instagram app and returns Home when earned time runs out. Does not read screen content. Can be disabled in accessibility settings. Browser Instagram is not monitored.</string>
     <string name="app_name">Workout2Scroll</string>
+    <string name="your_scroll_balance">INSTAGRAM TIME</string>
+    <string name="initial_balance">0:00 available</string>
+    <string name="initial_squats">Squats: 0</string>
+    <string name="workout_session">THIS SESSION</string>
+    <string name="live_camera">Live Camera</string>
+    <string name="upload_video">Upload Video</string>
+    <string name="workout_video">Your workout video</string>
+    <string name="select_video">Select Video</string>
+    <string name="processing_video">Processing video…</string>
+    <string name="cancel">Cancel</string>
     <string name="balance_format">%1$d:%2$02d available</string>
     <string name="daily_stats_format">Today: %1$d min earned · %2$d min used</string>
     <string name="guard_active">Instagram Guard: active</string>

@@ -4,20 +4,24 @@
     <color name="white">#FFFFFFFF</color>
     
     <!-- App Theme Colors -->
-    <color name="background_color">#FF121212</color>
-    <color name="header_background">#FF1E1E1E</color>
-    <color name="card_background">#FF2A2A2A</color>
+    <color name="background_color">#FFF5F7F6</color>
+    <color name="header_background">#FFF5F7F6</color>
+    <color name="card_background">#FFFFFFFF</color>
     
     <!-- Text Colors -->
-    <color name="primary_text">#FFFFFFFF</color>
-    <color name="secondary_text">#FFBBBBBB</color>
+    <color name="primary_text">#FF172B26</color>
+    <color name="secondary_text">#FF566B63</color>
     
     <!-- Button Colors -->
-    <color name="instagram_color">#FFE4405F</color>
-    <color name="start_color">#FF4CAF50</color>
-    <color name="stop_color">#FFF44336</color>
+    <color name="instagram_color">#FF994128</color>
+    <color name="start_color">#FF19664F</color>
+    <color name="stop_color">#FFB32636</color>
     <color name="reset_color">#FFFF9800</color>
-    <color name="progress_color">#FF03DAC5</color>
+    <color name="progress_color">#FF19664F</color>
+    <color name="balance_background">#FFF8E8DD</color>
+    <color name="outline_color">#FFD7E1DB</color>
+    <color name="camera_background">#FF172B26</color>
+    <color name="icon_accent">#FFD8F477</color>
     
     <!-- Pose Detection Colors -->
     <color name="pose_line_color">#FF00FF00</color>

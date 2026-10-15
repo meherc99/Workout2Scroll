@@ -1,16 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Workout2Scroll" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/instagram_color</item>
+    <style name="Theme.Workout2Scroll" parent="Theme.Workout2Scroll.Base" />
+    <style name="Theme.Workout2Scroll.Base" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/start_color</item>
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorPrimaryContainer">@color/header_background</item>
-        <item name="colorOnPrimaryContainer">@color/white</item>
+        <item name="colorOnPrimaryContainer">@color/primary_text</item>
         <item name="colorSecondary">@color/progress_color</item>
         <item name="colorOnSecondary">@color/black</item>
         <item name="colorSurface">@color/background_color</item>
         <item name="colorOnSurface">@color/primary_text</item>
+        <item name="colorOnSurfaceVariant">@color/secondary_text</item>
+        <item name="colorOutline">@color/outline_color</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowBackground">@color/background_color</item>
+        <item name="materialButtonStyle">@style/Widget.Workout2Scroll.Button</item>
         <item name="android:statusBarColor">@color/header_background</item>
-        <item name="android:navigationBarColor">@color/background_color</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/camera_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="TextAppearance.Workout2Scroll.Tab" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+    <style name="Widget.Workout2Scroll.Button" parent="Widget.Material3.Button">
+        <item name="cornerRadius">8dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="iconPadding">10dp</item>
     </style>
 </resources>
