@@ -12,11 +12,13 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.workout2scroll.utils.InstagramTimeManager
 
 class InstagramGuardService : AccessibilityService() {
     companion object {
+        private const val TAG = "W2S.Guard"
         @Volatile var isConnected = false
             private set
     }
@@ -28,6 +30,7 @@ class InstagramGuardService : AccessibilityService() {
     private var screenReceiverRegistered = false
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d(TAG, "Screen transition: action=${intent?.action} instagramVisible=$instagramVisible")
             settleUsage()
         }
     }
@@ -41,6 +44,7 @@ class InstagramGuardService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
+        Log.i(TAG, "Accessibility guard connected")
         timeManager = InstagramTimeManager(this)
         session = ForegroundSession(SystemClock.elapsedRealtime())
         isConnected = true
@@ -56,11 +60,15 @@ class InstagramGuardService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!isConnected || event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val foregroundPackage = event.packageName?.toString() ?: return
+        val previouslyVisible = instagramVisible
         settleUsage()
         if (foregroundPackage != "com.android.systemui" && !isKeyboardPackage(foregroundPackage)) {
             instagramVisible = foregroundPackage == "com.instagram.android"
         }
         settleUsage()
+        if (instagramVisible != previouslyVisible) {
+            Log.d(TAG, "Instagram foreground state changed: visible=$instagramVisible screenAvailable=${screenAvailable()}")
+        }
         if (instagramVisible && screenAvailable() && timeManager.shouldBlockInstagram()) blockInstagram()
     }
 
@@ -82,7 +90,9 @@ class InstagramGuardService : AccessibilityService() {
         val now = SystemClock.elapsedRealtime()
         if (now - lastBlocked < 1_000L) return
         lastBlocked = now
-        if (performGlobalAction(GLOBAL_ACTION_HOME)) {
+        val returnedHome = performGlobalAction(GLOBAL_ACTION_HOME)
+        Log.i(TAG, "Expired-time enforcement: returnedHome=$returnedHome")
+        if (returnedHome) {
             instagramVisible = false
             settleUsage()
             Toast.makeText(this, "Instagram time is up. Complete a workout to earn more.", Toast.LENGTH_LONG).show()
@@ -90,12 +100,14 @@ class InstagramGuardService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        Log.w(TAG, "Accessibility guard interrupted: connected=$isConnected instagramVisible=$instagramVisible")
         if (isConnected) settleUsage()
         instagramVisible = false
         if (isConnected) settleUsage()
     }
 
     override fun onDestroy() {
+        Log.i(TAG, "Accessibility guard destroyed: connected=$isConnected instagramVisible=$instagramVisible")
         if (isConnected) settleUsage()
         instagramVisible = false
         isConnected = false

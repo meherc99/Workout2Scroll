@@ -258,6 +258,16 @@
             android:textSize="16sp"
             android:backgroundTint="@color/start_color" />
 
+            <Button
+                android:id="@+id/stopWorkoutButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="@string/stop_workout"
+                android:textSize="16sp"
+                android:backgroundTint="@color/stop_color"
+                android:visibility="gone" />
+
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

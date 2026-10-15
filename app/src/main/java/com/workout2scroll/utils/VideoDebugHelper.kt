@@ -7,7 +7,7 @@ import android.util.Log
 
 object VideoDebugHelper {
     
-    private const val TAG = "VideoDebugHelper"
+    private const val TAG = "W2S.VideoMetadata"
     
     fun logVideoInfo(context: Context, videoUri: Uri): String {
         val retriever = MediaMetadataRetriever()
@@ -25,7 +25,7 @@ object VideoDebugHelper {
             val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
             
             info.append("Video Info:\n")
-            info.append("URI: $videoUri\n")
+            info.append("Source scheme: ${videoUri.scheme}\n")
             info.append("Duration: ${duration}ms (${(duration?.toLongOrNull() ?: 0) / 1000}s)\n")
             info.append("Resolution: ${width}x${height}\n")
             info.append("Frame Rate: $frameRate fps\n")
@@ -43,6 +43,7 @@ object VideoDebugHelper {
                     info.append("Frame extraction: FAILED - null bitmap\n")
                 }
             } catch (e: Exception) {
+                Log.w(TAG, "Diagnostic frame extraction failed", e)
                 info.append("Frame extraction: FAILED - ${e.message}\n")
             }
             
@@ -65,6 +66,8 @@ object VideoDebugHelper {
     
     fun validateVideoForProcessing(context: Context, videoUri: Uri): ValidationResult {
         val retriever = MediaMetadataRetriever()
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        Log.i(TAG, "Video validation started: scheme=${videoUri.scheme}")
         
         try {
             retriever.setDataSource(context, videoUri)
@@ -73,15 +76,19 @@ object VideoDebugHelper {
             val widthStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
             val heightStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
             val mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+            Log.d(TAG, "Raw validation metadata: duration=$durationStr width=$widthStr height=$heightStr mime=$mimeType hasVideo=${retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO)} rotation=${retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)}")
             
-            val duration = durationStr?.toLongOrNull() ?: 0L
+            val duration = VideoDurationReader.read(context, videoUri, retriever)
             val width = widthStr?.toIntOrNull() ?: 0
             val height = heightStr?.toIntOrNull() ?: 0
             
             val issues = mutableListOf<String>()
             
             if (duration == 0L) {
-                issues.add("Cannot read video duration")
+                Log.w(TAG, "No duration available from retriever or video tracks: raw=$durationStr")
+                issues.add("Cannot read video duration. Download the video to your phone or export it as MP4 and try again.")
+            } else if (duration < 1_000) {
+                issues.add("Video too short. Minimum duration is 1 second.")
             } else if (duration > 600_000) { // 10 minutes
                 issues.add("Video too long (${duration/1000}s > 600s)")
             }
@@ -100,14 +107,22 @@ object VideoDebugHelper {
             try {
                 val testFrame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                 if (testFrame == null) {
+                    Log.w(TAG, "Validation frame extraction returned null at timestampUs=0")
                     issues.add("Cannot extract video frames")
                 } else {
+                    Log.d(TAG, "Validation frame decoded: size=${testFrame.width}x${testFrame.height}")
                     testFrame.recycle()
                 }
             } catch (e: Exception) {
+                Log.w(TAG, "Validation frame decoding failed", e)
                 issues.add("Frame extraction failed: ${e.message}")
             }
             
+            if (issues.isEmpty()) {
+                Log.i(TAG, "Video validation passed: durationMs=$duration size=${width}x${height}")
+            } else {
+                Log.w(TAG, "Video validation failed: issues=$issues")
+            }
             return ValidationResult(
                 isValid = issues.isEmpty(),
                 issues = issues,
@@ -118,6 +133,7 @@ object VideoDebugHelper {
             )
             
         } catch (e: Exception) {
+            Log.e(TAG, "Video validation could not read metadata", e)
             return ValidationResult(
                 isValid = false,
                 issues = listOf("Error accessing video file: ${e.message}"),
@@ -132,6 +148,7 @@ object VideoDebugHelper {
             } catch (e: Exception) {
                 Log.w(TAG, "Error releasing MediaMetadataRetriever: ${e.message}")
             }
+            Log.i(TAG, "Video validation ended: elapsedMs=${android.os.SystemClock.elapsedRealtime() - startedAt}")
         }
     }
     

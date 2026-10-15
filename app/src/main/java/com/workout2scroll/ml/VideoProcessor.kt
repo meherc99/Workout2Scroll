@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
+import com.workout2scroll.utils.VideoDurationReader
 import kotlinx.coroutines.*
 import kotlin.math.min
 
@@ -18,7 +19,7 @@ class VideoProcessor(
 ) {
 
     companion object {
-        private const val TAG = "VideoProcessor"
+        private const val TAG = "W2S.Video"
         private const val FRAME_INTERVAL_MS = 100 // Process every 100ms (10 FPS)
         private const val MAX_VIDEO_DURATION_MS = 600_000 // 10 minutes max
         private const val MIN_FRAME_WIDTH = 224
@@ -32,10 +33,13 @@ class VideoProcessor(
 
     suspend fun processVideo(videoUri: Uri): Unit = coroutineScope {
         if (isProcessing) {
+            Log.w(TAG, "Video processing request rejected: already running")
             onError("Video processing already in progress")
             return@coroutineScope
         }
         isProcessing = true
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        Log.i(TAG, "Video processing started: scheme=${videoUri.scheme} poseReady=${poseDetector.isReady}")
         processingJob = coroutineContext[Job]
         try {
           withContext(Dispatchers.IO) {
@@ -47,7 +51,7 @@ class VideoProcessor(
 
                 // Try to set data source with better error handling
                 try {
-                    Log.d(TAG, "Setting data source for URI: $videoUri")
+                    Log.d(TAG, "Opening video data source: scheme=${videoUri.scheme}")
                     retriever.setDataSource(context, videoUri)
                 } catch (e: SecurityException) {
                     Log.e(TAG, "Security exception accessing video", e)
@@ -95,6 +99,7 @@ class VideoProcessor(
 
                 // Process frames with improved error handling
                 val totalFrames = VideoTimeline.frameCount(duration)
+                Log.i(TAG, "Video sampling plan: durationMs=$duration intervalMs=${VideoTimeline.INTERVAL_MS} frames=$totalFrames")
                 var processedFrames = 0
                 var currentSquatCount = 0
                 var successfulFrames = 0
@@ -113,12 +118,15 @@ class VideoProcessor(
                                 squatCounter.analyzePose(poseData)
                                 currentSquatCount = squatCounter.getCount()
                                 successfulFrames++
+                                if (successfulFrames == 1 || successfulFrames % 60 == 0) {
+                                    Log.d(TAG, "Frame inferred: timestampUs=$timeUs successful=$successfulFrames/$totalFrames confidence=${poseData.confidence} squats=$currentSquatCount elapsedMs=${android.os.SystemClock.elapsedRealtime() - startedAt}")
+                                }
                             } finally {
                                 bitmap.recycle()
                             }
                         } else {
                             squatCounter.resetMovement()
-                            android.util.Log.w("VideoProcessor", "Failed to extract frame at ${timeUs}us")
+                            Log.w(TAG, "Frame extraction returned no usable bitmap: timestampUs=$timeUs")
                         }
 
                         processedFrames++
@@ -139,7 +147,7 @@ class VideoProcessor(
                     } catch (e: Exception) {
                         squatCounter.resetMovement()
                         if (!poseDetector.isReady) throw e
-                        android.util.Log.w("VideoProcessor", "Error processing frame at ${timeUs}us: ${e.message}")
+                        Log.w(TAG, "Frame processing failed: timestampUs=$timeUs attempted=$processedFrames successful=$successfulFrames", e)
                         // Skip frame if there's an error but continue processing
                         processedFrames++
                         continue
@@ -148,6 +156,7 @@ class VideoProcessor(
 
                 // Final validation
                 if (successfulFrames == 0) {
+                    Log.e(TAG, "No video frames successfully inferred: attempted=$processedFrames planned=$totalFrames")
                     withContext(Dispatchers.Main) {
                         onError("No frames could be processed. The video format may not be supported.")
                     }
@@ -157,27 +166,30 @@ class VideoProcessor(
                 // Complete processing
                 withContext(Dispatchers.Main) {
                     if (isProcessing) {
+                        Log.i(TAG, "Video processing complete: attempted=$processedFrames successful=$successfulFrames planned=$totalFrames squats=$currentSquatCount elapsedMs=${android.os.SystemClock.elapsedRealtime() - startedAt}")
                         onProgress(100, currentSquatCount)
                         onComplete(currentSquatCount)
                     }
                 }
 
             } catch (e: CancellationException) {
+                Log.i(TAG, "Video processing cancelled after ${android.os.SystemClock.elapsedRealtime() - startedAt}ms")
                 throw e
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     onError("Error processing video: ${e.message ?: "Unknown error"}")
                 }
-                android.util.Log.e("VideoProcessor", "Video processing failed", e)
+                Log.e(TAG, "Video processing failed", e)
             } finally {
                 try {
                     retriever?.release()
                 } catch (e: Exception) {
-                    android.util.Log.w("VideoProcessor", "Error releasing MediaMetadataRetriever: ${e.message}")
+                    Log.w(TAG, "Video retriever release failed", e)
                 }
             }
           }
         } finally {
+            Log.i(TAG, "Video processing ended: elapsedMs=${android.os.SystemClock.elapsedRealtime() - startedAt}")
             isProcessing = false
             processingJob = null
         }
@@ -206,7 +218,7 @@ class VideoProcessor(
     )
 
     private fun extractVideoMetadata(retriever: MediaMetadataRetriever, videoUri: Uri): VideoMetadata {
-        Log.d(TAG, "Extracting metadata for video: $videoUri")
+        Log.d(TAG, "Extracting video metadata: scheme=${videoUri.scheme}")
 
         // Extract basic metadata
         val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -220,7 +232,7 @@ class VideoProcessor(
                 "frameRate: $frameRateStr, hasVideo: $hasVideoStr, mimeType: $mimeType")
 
         // Try multiple approaches to get duration
-        val duration = extractDurationWithFallbacks(retriever, durationStr, videoUri)
+        val duration = VideoDurationReader.read(context, videoUri, retriever)
 
         val width = widthStr?.toIntOrNull() ?: 0
         val height = heightStr?.toIntOrNull() ?: 0
@@ -259,7 +271,7 @@ class VideoProcessor(
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to estimate duration from frame count: ${e.message}")
+            Log.w(TAG, "Failed to estimate duration from frame count", e)
         }
 
         // Method 3: Try to extract frames at different times to estimate duration
@@ -278,6 +290,7 @@ class VideoProcessor(
                         break // No more frames available
                     }
                 } catch (e: Exception) {
+                    Log.w(TAG, "Duration probe failed: timestampUs=$timeUs", e)
                     break // Can't extract frame at this time
                 }
             }
@@ -288,7 +301,7 @@ class VideoProcessor(
                 return estimatedDuration
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to estimate duration from frame sampling: ${e.message}")
+            Log.w(TAG, "Failed to estimate duration from frame sampling", e)
         }
 
         // Method 4: Check file properties if possible
@@ -305,7 +318,7 @@ class VideoProcessor(
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to estimate duration from file size: ${e.message}")
+            Log.w(TAG, "Failed to estimate duration from file size", e)
         }
 
         Log.w(TAG, "All duration extraction methods failed")

@@ -6,6 +6,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.RectF
+import android.os.SystemClock
+import android.util.Log
 import androidx.camera.core.ImageProxy
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
@@ -31,6 +33,7 @@ data class PoseData(
 class PoseDetector(private val context: Context) {
     
     companion object {
+        private const val TAG = "W2S.Pose"
         private const val MODEL_FILE = "movenet_singlepose_lightning.tflite"
         private const val INPUT_SIZE = 192
         
@@ -55,18 +58,25 @@ class PoseDetector(private val context: Context) {
     }
     
     private var interpreter: Interpreter? = null
+    private var inferenceCount = 0L
     var initializationError: String? = null
         private set
     val isReady: Boolean get() = interpreter != null
     
     init {
+        val startedAt = SystemClock.elapsedRealtime()
         try {
+            Log.i(TAG, "Loading MoveNet: asset=$MODEL_FILE threads=2")
             val model = FileUtil.loadMappedFile(context, MODEL_FILE)
             interpreter = Interpreter(model, Interpreter.Options().setNumThreads(2))
             require(interpreter!!.getInputTensor(0).shape().contentEquals(intArrayOf(1, INPUT_SIZE, INPUT_SIZE, 3))) {
                 "Unsupported MoveNet input shape"
             }
+            val input = interpreter!!.getInputTensor(0)
+            val output = interpreter!!.getOutputTensor(0)
+            Log.i(TAG, "Model ready: inputShape=${input.shape().contentToString()} inputType=${input.dataType()} inputBytes=${input.numBytes()} outputShape=${output.shape().contentToString()} outputType=${output.dataType()} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}")
         } catch (e: Exception) {
+            Log.e(TAG, "MoveNet initialization failed after ${SystemClock.elapsedRealtime() - startedAt}ms", e)
             interpreter?.close()
             interpreter = null
             initializationError = e.message ?: "MoveNet model could not be loaded"
@@ -87,6 +97,7 @@ class PoseDetector(private val context: Context) {
     
     @Synchronized
     fun detectPoseFromBitmap(bitmap: Bitmap): PoseData {
+        val startedAt = SystemClock.elapsedRealtime()
         val interpreter = checkNotNull(this.interpreter) { initializationError ?: "Pose detector is closed" }
         val scale = min(INPUT_SIZE.toFloat() / bitmap.width, INPUT_SIZE.toFloat() / bitmap.height)
         val scaledWidth = bitmap.width * scale
@@ -124,7 +135,15 @@ class PoseDetector(private val context: Context) {
                     values[2]
                 )
             }
-            return PoseData(keypoints, keypoints.map { it.confidence }.average().toFloat(), bitmap.width, bitmap.height)
+            val confidence = keypoints.map { it.confidence }.average().toFloat()
+            inferenceCount++
+            if (inferenceCount == 1L || inferenceCount % 60L == 0L) {
+                Log.d(TAG, "Inference completed: frame=$inferenceCount size=${bitmap.width}x${bitmap.height} bitmapConfig=${bitmap.config} scale=$scale confidence=$confidence elapsedMs=${SystemClock.elapsedRealtime() - startedAt}")
+            }
+            return PoseData(keypoints, confidence, bitmap.width, bitmap.height)
+        } catch (error: Exception) {
+            Log.e(TAG, "Inference failed: frame=${inferenceCount + 1} size=${bitmap.width}x${bitmap.height} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}", error)
+            throw error
         } finally {
             inputBitmap.recycle()
         }
@@ -138,6 +157,7 @@ class PoseDetector(private val context: Context) {
     
     @Synchronized
     fun close() {
+        Log.i(TAG, "Closing pose detector: ready=$isReady successfulInferences=$inferenceCount")
         interpreter?.close()
         interpreter = null
     }

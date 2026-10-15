@@ -12,6 +12,9 @@ import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility
+import androidx.test.espresso.matcher.ViewMatchers.Visibility
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertTrue
@@ -45,9 +48,11 @@ class LiveCameraTest {
             assertTrue("Camera did not stream", streaming.await(30, TimeUnit.SECONDS))
             onView(withId(R.id.startWorkoutButton)).perform(scrollTo(), click())
             assertTrue("Live camera frames did not reach inference", inferred.await(30, TimeUnit.SECONDS))
-            onView(withId(R.id.startWorkoutButton)).check(matches(withText(R.string.stop_workout)))
-            onView(withId(R.id.startWorkoutButton)).perform(click())
+            onView(withId(R.id.stopWorkoutButton)).perform(scrollTo()).check(matches(isDisplayed()))
+            onView(withId(R.id.startWorkoutButton)).check(matches(withEffectiveVisibility(Visibility.GONE)))
+            onView(withId(R.id.stopWorkoutButton)).perform(click())
             onView(withId(R.id.startWorkoutButton)).check(matches(withText(R.string.start_workout)))
+            onView(withId(R.id.stopWorkoutButton)).check(matches(withEffectiveVisibility(Visibility.GONE)))
         }
     }
 }

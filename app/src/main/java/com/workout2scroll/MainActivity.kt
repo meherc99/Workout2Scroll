@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import android.provider.Settings
 import android.view.View
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -35,6 +36,11 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        private const val TAG = "W2S.Activity"
+    }
+
+    private var analyzedFrames = 0L
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraExecutor: ExecutorService
@@ -57,6 +63,7 @@ class MainActivity : AppCompatActivity() {
     private val requestCameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
+        Log.i(TAG, "Camera permission result: granted=$isGranted lifecycle=${lifecycle.currentState}")
         if (isGranted) {
             startCamera()
         } else {
@@ -77,6 +84,7 @@ class MainActivity : AppCompatActivity() {
     private val videoPickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
+        Log.i(TAG, "Video picker result: selected=${uri != null} scheme=${uri?.scheme}")
         if (uri != null) {
             processSelectedVideo(uri)
         } else {
@@ -89,12 +97,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.i(TAG, "onCreate: restored=${savedInstanceState != null} sdk=${android.os.Build.VERSION.SDK_INT} model=${android.os.Build.MODEL}")
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         initializeComponents()
         setupUI()
+        Log.i(TAG, "Components initialized: poseReady=${poseDetector.isReady} cameraPermission=${allPermissionsGranted()}")
         if (!poseDetector.isReady) {
+            Log.e(TAG, "Pose model initialization failed: ${poseDetector.initializationError}")
             binding.tvStatus.text = "Pose model unavailable: ${poseDetector.initializationError}"
             binding.startWorkoutButton.isEnabled = false
             binding.selectVideoButton.isEnabled = false
@@ -120,12 +131,14 @@ class MainActivity : AppCompatActivity() {
             },
             onComplete = { totalSquats ->
                 runOnUiThread {
+                    Log.i(TAG, "Video completion received: squats=$totalSquats")
                     binding.processingStatusText.text = "Processing complete!"
                     binding.squatCountText.text = getString(R.string.squat_count_format, totalSquats)
 
                     // Award minutes for video squats
                     val fingerprint = checkNotNull(videoFingerprint)
                     if (!instagramTimeManager.rewardVideoOnce(fingerprint, totalSquats)) {
+                        Log.w(TAG, "Video reward rejected: previously rewarded content")
                         binding.tvStatus.text = "This video has already earned its reward"
                         return@runOnUiThread
                     }
@@ -155,6 +168,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupUI() {
         updateInstagramTime()
+        binding.cameraPreviewView.previewStreamState.observe(this) { state ->
+            Log.i(TAG, "Preview stream state: state=$state liveMode=$isLiveMode cameraReady=$cameraReady size=${binding.cameraPreviewView.width}x${binding.cameraPreviewView.height} shown=${binding.cameraPreviewView.isShown}")
+        }
 
         // Setup tab layout
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
@@ -171,13 +187,8 @@ class MainActivity : AppCompatActivity() {
         // Initially show live mode
         switchToLiveMode()
 
-        binding.startWorkoutButton.setOnClickListener {
-            if (isWorkoutActive) {
-                stopWorkout()
-            } else {
-                startWorkout()
-            }
-        }
+        binding.startWorkoutButton.setOnClickListener { startWorkout() }
+        binding.stopWorkoutButton.setOnClickListener { stopWorkout() }
 
         binding.selectVideoButton.setOnClickListener {
             checkStoragePermissionAndSelectVideo()
@@ -195,6 +206,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onSquatDetected() {
         runOnUiThread {
+            Log.i(TAG, "Squat reward: session=$workoutSession count=${squatCounter.getCount()} minutes=1")
             binding.squatCountText.text = getString(R.string.squat_count_format, squatCounter.getCount())
             // Award 1 minute per squat
             instagramTimeManager.addTime(1)
@@ -203,14 +215,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun switchToLiveMode() {
+        Log.i(TAG, "Switch to live mode: videoJobActive=${videoJob?.isActive} cameraPermission=${allPermissionsGranted()}")
         if (videoJob?.isActive == true) cancelVideoProcessing()
         isLiveMode = true
         binding.cameraView.visibility = View.VISIBLE
         binding.cameraPreviewView.visibility = View.VISIBLE
         binding.poseOverlayView.visibility = View.VISIBLE
-        binding.startWorkoutButton.visibility = View.VISIBLE
+        binding.startWorkoutButton.visibility = if (isWorkoutActive) View.GONE else View.VISIBLE
+        binding.stopWorkoutButton.visibility = if (isWorkoutActive) View.VISIBLE else View.GONE
         binding.videoUploadLayout.visibility = View.GONE
         binding.videoProcessingLayout.visibility = View.GONE
+        logWorkoutControlBounds()
 
         if (allPermissionsGranted()) {
             startCamera()
@@ -218,11 +233,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun switchToVideoMode() {
+        Log.i(TAG, "Switch to video mode: workoutActive=$isWorkoutActive")
         isLiveMode = false
         binding.cameraView.visibility = View.GONE
         binding.cameraPreviewView.visibility = View.GONE
         binding.poseOverlayView.visibility = View.GONE
         binding.startWorkoutButton.visibility = View.GONE
+        binding.stopWorkoutButton.visibility = View.GONE
         binding.videoUploadLayout.visibility = View.VISIBLE
         binding.videoProcessingLayout.visibility = View.GONE
 
@@ -238,19 +255,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectVideo() {
+        Log.i(TAG, "Opening video picker")
         try {
             videoPickerLauncher.launch("video/*")
         } catch (e: Exception) {
+            Log.e(TAG, "Could not launch video picker", e)
             Toast.makeText(this, "Error opening video picker: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun processSelectedVideo(videoUri: Uri) {
-        if (videoJob?.isActive == true || !poseDetector.isReady) return
+        if (videoJob?.isActive == true || !poseDetector.isReady) {
+            Log.w(TAG, "Video processing skipped: jobActive=${videoJob?.isActive} poseReady=${poseDetector.isReady}")
+            return
+        }
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        Log.i(TAG, "Video processing requested: scheme=${videoUri.scheme}")
         // Validate URI first
         try {
             requireNotNull(contentResolver.openInputStream(videoUri)).close()
         } catch (e: Exception) {
+            Log.e(TAG, "Selected video could not be opened", e)
             Toast.makeText(this, "Cannot access selected video file. Please try again.", Toast.LENGTH_LONG).show()
             return
         }
@@ -268,6 +293,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             if (instagramTimeManager.hasRewardedVideo(checkNotNull(videoFingerprint))) {
+                Log.w(TAG, "Video rejected: previously rewarded content")
                 binding.tvStatus.text = "This video has already earned its reward"
                 return@launch
             }
@@ -277,6 +303,7 @@ class MainActivity : AppCompatActivity() {
                 com.workout2scroll.utils.VideoDebugHelper.validateVideoForProcessing(this@MainActivity, videoUri)
             }
                 if (!validation.isValid) {
+                    Log.w(TAG, "Video validation rejected: durationMs=${validation.duration} size=${validation.width}x${validation.height} mime=${validation.mimeType} issues=${validation.issues}")
                     val issues = validation.issues.joinToString("\n• ", "Issues found:\n• ")
                     Toast.makeText(this@MainActivity, issues, Toast.LENGTH_LONG).show()
                     binding.tvStatus.text = validation.issues.joinToString(". ")
@@ -291,10 +318,13 @@ class MainActivity : AppCompatActivity() {
 
                 videoProcessor.processVideo(videoUri)
           } catch (cancelled: CancellationException) {
+                            Log.i(TAG, "Video job cancelled after ${android.os.SystemClock.elapsedRealtime() - startedAt}ms")
               throw cancelled
           } catch (error: Exception) {
+                            Log.e(TAG, "Video job failed after ${android.os.SystemClock.elapsedRealtime() - startedAt}ms", error)
               binding.tvStatus.text = "Video failed: ${error.message}"
           } finally {
+              Log.i(TAG, "Video job ended: elapsedMs=${android.os.SystemClock.elapsedRealtime() - startedAt}")
               videoFingerprint = null
               binding.videoProcessingLayout.visibility = View.GONE
               binding.videoUploadLayout.visibility = if (isLiveMode) View.GONE else View.VISIBLE
@@ -303,6 +333,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun cancelVideoProcessing() {
+        Log.i(TAG, "Video cancellation requested: jobActive=${videoJob?.isActive}")
         videoProcessor.cancelProcessing()
         videoJob?.cancel()
         binding.videoProcessingLayout.visibility = View.GONE
@@ -331,12 +362,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startCamera() {
-        if (!isLiveMode || !allPermissionsGranted() || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+        Log.d(TAG, "startCamera: liveMode=$isLiveMode permission=${allPermissionsGranted()} lifecycle=${lifecycle.currentState}")
+        if (!isLiveMode || !allPermissionsGranted() || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            Log.w(TAG, "Camera startup deferred: liveMode=$isLiveMode permission=${allPermissionsGranted()} lifecycle=${lifecycle.currentState}")
+            return
+        }
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            if (!isLiveMode || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@addListener
+            if (!isLiveMode || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                Log.w(TAG, "Camera provider arrived after startup conditions changed: liveMode=$isLiveMode destroyed=$isDestroyed lifecycle=${lifecycle.currentState}")
+                return@addListener
+            }
             try {
                 val provider = cameraProviderFuture.get()
                 cameraProvider = provider
@@ -355,8 +393,10 @@ class MainActivity : AppCompatActivity() {
                     this, cameraSelector, preview, imageAnalyzer
                 )
                 cameraReady = true
+                Log.i(TAG, "Camera bound: front=$usingFrontCamera preview=${binding.cameraPreviewView.width}x${binding.cameraPreviewView.height} rotation=${binding.cameraPreviewView.display?.rotation}")
                 if (!isWorkoutActive) binding.tvStatus.text = getString(R.string.stand_in_front_camera)
             } catch (exc: Exception) {
+                Log.e(TAG, "Camera initialization or lifecycle binding failed", exc)
                 cameraReady = false
                 stopWorkout()
                 binding.tvStatus.text = "Camera unavailable. Upload a video instead."
@@ -366,7 +406,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startWorkout() {
-        if (!poseDetector.isReady) return
+        Log.i(TAG, "Start workout requested: poseReady=${poseDetector.isReady} permission=${allPermissionsGranted()} cameraReady=$cameraReady")
+        if (!poseDetector.isReady) {
+            Log.e(TAG, "Workout rejected: pose model unavailable")
+            return
+        }
         if (!allPermissionsGranted()) {
             requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             return
@@ -378,20 +422,26 @@ class MainActivity : AppCompatActivity() {
         }
         workoutSession++
         isWorkoutActive = true
+        analyzedFrames = 0L
+        Log.i(TAG, "Workout started: session=$workoutSession")
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        binding.startWorkoutButton.text = getString(R.string.stop_workout)
+        binding.startWorkoutButton.visibility = View.GONE
+        binding.stopWorkoutButton.visibility = View.VISIBLE
         squatCounter.reset()
         binding.squatCountText.text = getString(R.string.squat_count_format, 0)
         binding.tvStatus.text = getString(R.string.detecting_pose)
     }
 
     private fun stopWorkout() {
+        Log.i(TAG, "Stop workout: wasActive=$isWorkoutActive session=$workoutSession analyzedFrames=$analyzedFrames")
         isWorkoutActive = false
         workoutSession++
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.poseOverlayView.clearPose()
         if (::squatCounter.isInitialized) squatCounter.resetMovement()
         binding.startWorkoutButton.text = getString(R.string.start_workout)
+        binding.startWorkoutButton.visibility = if (isLiveMode) View.VISIBLE else View.GONE
+        binding.stopWorkoutButton.visibility = View.GONE
         binding.tvStatus.text = "Workout stopped"
     }
 
@@ -432,7 +482,12 @@ class MainActivity : AppCompatActivity() {
             val session = workoutSession
             try {
                 if (isWorkoutActive && isLiveMode) {
+                    val inferenceStartedAt = android.os.SystemClock.elapsedRealtime()
                     val poseData = poseDetector.detectPose(imageProxy, usingFrontCamera)
+                    analyzedFrames++
+                    if (analyzedFrames == 1L || analyzedFrames % 60L == 0L) {
+                        Log.d(TAG, "Camera inference: session=$session frame=$analyzedFrames size=${imageProxy.width}x${imageProxy.height} format=${imageProxy.format} rotation=${imageProxy.imageInfo.rotationDegrees} confidence=${poseData.confidence} elapsedMs=${android.os.SystemClock.elapsedRealtime() - inferenceStartedAt}")
+                    }
                     runOnUiThread {
                         if (isWorkoutActive && isLiveMode && session == workoutSession && !isDestroyed) {
                             squatCounter.analyzePose(poseData)
@@ -446,6 +501,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             } catch (error: Exception) {
+                Log.e(TAG, "Live frame processing failed: session=$session size=${imageProxy.width}x${imageProxy.height} format=${imageProxy.format}", error)
                 runOnUiThread {
                     if (isWorkoutActive && session == workoutSession) {
                         stopWorkout()
@@ -460,6 +516,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.i(TAG, "onResume: liveMode=$isLiveMode cameraPermission=${allPermissionsGranted()}")
+        logWorkoutControlBounds()
         if (isLiveMode && allPermissionsGranted()) startCamera()
         if (isLiveMode && !allPermissionsGranted()) binding.tvStatus.text = getString(R.string.camera_permission_required)
         refreshJob = lifecycleScope.launch {
@@ -471,12 +529,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        Log.i(TAG, "onPause: workoutActive=$isWorkoutActive videoJobActive=${videoJob?.isActive}")
         refreshJob?.cancel()
         if (isWorkoutActive) stopWorkout()
         super.onPause()
     }
 
     override fun onStop() {
+        Log.i(TAG, "onStop: releasing camera")
         imageAnalyzer?.clearAnalyzer()
         cameraProvider?.unbindAll()
         cameraReady = false
@@ -484,6 +544,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        Log.i(TAG, "onDestroy: cancelling video and closing pose detector")
         videoJob?.cancel()
         videoProcessor.cancelProcessing()
         imageAnalyzer?.clearAnalyzer()
@@ -491,5 +552,14 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor.execute { poseDetector.close() }
         cameraExecutor.shutdown()
         super.onDestroy()
+    }
+
+    private fun logWorkoutControlBounds() {
+        binding.startWorkoutButton.post {
+            if (isDestroyed) return@post
+            val visibleBounds = android.graphics.Rect()
+            val visible = binding.startWorkoutButton.getGlobalVisibleRect(visibleBounds)
+            Log.d(TAG, "Workout control: liveMode=$isLiveMode shown=${binding.startWorkoutButton.isShown} enabled=${binding.startWorkoutButton.isEnabled} size=${binding.startWorkoutButton.width}x${binding.startWorkoutButton.height} visible=$visible bounds=$visibleBounds rootHeight=${binding.root.height}")
+        }
     }
 }
